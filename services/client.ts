@@ -10,7 +10,7 @@ const baseURL =
   ''
 
 export const api = axios.create({
-  baseURL: baseURL ? `${baseURL}/api` : '/api',
+  baseURL: baseURL || '/api',
   timeout: 40000, // ⬅️ 20s global
 })
 

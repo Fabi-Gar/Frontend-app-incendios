@@ -6,9 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 
 import { listIncendios, listIncendiosSinAprobar, type Incendio } from '@/services/incendios';
-import { getUser } from '@/session';
+import { getUser } from '@/services/session';
 import { isAdminUser } from '../utils/roles';
-import { api } from '@/client';
+import { api } from '@/services/client';
 import { getFirstPhotoUrlByIncendio } from '@/services/photos';
 import { cierreColor, cierreBadgeStyle } from '@/app/utils/estadoCierre';
 
@@ -885,6 +885,11 @@ export default function IncendiosList() {
                   </Text>
 
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                    {!(item as any)?.inab_objectid && !(item as any)?.inab_globalid && (
+                      <Text style={[styles.badgeMini, { backgroundColor: '#E3F2FD', color: '#1565C0' }]}>
+                        📱 App
+                      </Text>
+                    )}
                     <Text style={[styles.badgeMini, aprobado ? styles.badgeOk : styles.badgeWarn]}>
                       {aprobado ? '✓ Aprobado' : '⏱ Pendiente'}
                     </Text>

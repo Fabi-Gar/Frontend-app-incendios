@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Image, TouchableOpacity } from 'react-native';
 import { Card, Text, ActivityIndicator } from 'react-native-paper';
-import { getFirstPhotoUrl } from '@/services/photos';
+import { getFirstPhotoUrlByIncendio } from '@/services/photos';
 
 const placeholder = require('../assets/images/placeholder_incendio.png');
 
@@ -20,7 +20,7 @@ export default function IncidentPhotoCard({ incendioId, title, subtitle, onPress
     let mounted = true;
     (async () => {
       try {
-        const url = await getFirstPhotoUrl(encendioIdSafe(incendioId));
+        const url = await getFirstPhotoUrlByIncendio(incendioId);
         if (mounted) setPhotoUrl(url);
       } finally {
         if (mounted) setBusy(false);

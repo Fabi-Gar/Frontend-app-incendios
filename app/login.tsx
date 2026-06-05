@@ -5,7 +5,7 @@ import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { router } from 'expo-router';
 import { login } from '../services/auth';
-import { saveToken, saveUser } from '../session';
+import { saveToken, saveUser } from '../services/session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PushNotificationService } from '../services/pushNotificationService';
 

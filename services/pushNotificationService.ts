@@ -1,6 +1,4 @@
-// services/pushNotificationService.ts
 import * as Notifications from 'expo-notifications';
-import messaging from '@react-native-firebase/messaging';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
@@ -8,31 +6,33 @@ import { router } from 'expo-router';
 export class PushNotificationService {
   
   /**
-   * Obtener el token FCM (Firebase Cloud Messaging)
+   * Obtener el token de Expo
    */
-  static async getFCMToken(): Promise<string | null> {
+  static async getExpoToken(): Promise<string | null> {
     try {
-      // Solicitar permisos primero
-      const permission = await messaging().requestPermission();
-      const enabled = 
-        permission === messaging.AuthorizationStatus.AUTHORIZED ||
-        permission === messaging.AuthorizationStatus.PROVISIONAL;
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
 
-      if (!enabled) {
+      if (finalStatus !== 'granted') {
         console.log('⚠️ Permisos de notificaciones denegados');
         return null;
       }
 
-      // Obtener token FCM
-      const fcmToken = await messaging().getToken();
-      console.log('🔥 FCM Token obtenido:', fcmToken.substring(0, 30) + '...');
+      // Obtener token de Expo
+      const projectId = '1b88fa29-0ad7-4035-8c50-50400f4978a5'; // Del app.json
+      const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      console.log('🔥 Expo Push Token obtenido:', token.substring(0, 30) + '...');
       
       // Guardar en AsyncStorage
-      await AsyncStorage.setItem('fcm_token', fcmToken);
+      await AsyncStorage.setItem('expo_push_token', token);
       
-      return fcmToken;
+      return token;
     } catch (error) {
-      console.error('❌ Error obteniendo FCM token:', error);
+      console.error('❌ Error obteniendo Expo token:', error);
       return null;
     }
   }
@@ -73,7 +73,6 @@ export class PushNotificationService {
         break;
 
       default:
-        // Navegar al listado de notificaciones
         router.push('/notificaciones');
     }
   }
@@ -84,71 +83,23 @@ export class PushNotificationService {
   static configureForegroundListener() {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
-        shouldShowBanner: true,    // Para mostrar banner/alert
-        shouldShowList: true,      // Para mostrar en centro de notificaciones
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
       }),
     });
 
-    // Listener cuando el usuario toca una notificación local
+    // Listener cuando el usuario toca una notificación local o remota en background/foreground
     Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data;
-      console.log('👆 Usuario tocó notificación local:', data);
+      console.log('👆 Usuario tocó notificación:', data);
       this.handleNotificationNavigation(data);
     });
-  }
 
-  /**
-   * Listener de notificaciones cuando la app está en background o cerrada
-   */
-  static configureBackgroundListener() {
-    // Notificación recibida cuando app en background
-    messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-      console.log('📩 Notificación en background:', remoteMessage);
-    });
-
-    // Cuando el usuario toca la notificación (app en background)
-    messaging().onNotificationOpenedApp((remoteMessage) => {
-      console.log('🔔 Notificación tocada (background):', remoteMessage);
-      if (remoteMessage.data) {
-        this.handleNotificationNavigation(remoteMessage.data);
-      }
-    });
-
-    // Cuando la app se abre desde una notificación (estaba cerrada)
-    messaging()
-      .getInitialNotification()
-      .then((remoteMessage) => {
-        if (remoteMessage) {
-          console.log('🔔 App abierta desde notificación:', remoteMessage);
-          if (remoteMessage.data) {
-            // Pequeño delay para asegurar que el router está listo
-            setTimeout(() => {
-              this.handleNotificationNavigation(remoteMessage.data);
-            }, 1000);
-          }
-        }
-      });
-  }
-
-  /**
-   * Listener de notificaciones en foreground
-   */
-  static configureForegroundMessageListener() {
-    messaging().onMessage(async (remoteMessage) => {
-      console.log('📨 Notificación en foreground:', remoteMessage);
-      
-      // Mostrar notificación local cuando la app está abierta
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: remoteMessage.notification?.title || 'Nueva notificación',
-          body: remoteMessage.notification?.body || '',
-          data: remoteMessage.data || {},
-          sound: 'default',
-        },
-        trigger: null, // Mostrar inmediatamente
-      });
+    // Listener de cuando llega una notificación (y la app está abierta)
+    Notifications.addNotificationReceivedListener((notification) => {
+      console.log('📨 Notificación recibida en foreground:', notification.request.content);
     });
   }
 
@@ -172,16 +123,16 @@ export class PushNotificationService {
    */
   static async registerToken(
     userId: string,
-    fcmToken: string,
+    expoPushToken: string,
     municipiosSuscritos: string[] = [],
     departamentosSuscritos: string[] = []
   ) {
     try {
-      const { api } = await import('../client');
+      const { api } = await import('./client');
       
       const response = await api.post('/push/register', {
         userId,
-        expoPushToken: fcmToken, // Backend lo espera con este nombre
+        expoPushToken, 
         municipiosSuscritos,
         departamentosSuscritos,
         avisarmeAprobado: true,
@@ -189,10 +140,10 @@ export class PushNotificationService {
         avisarmeCierres: true,
       });
 
-      console.log('✅ Token FCM registrado en backend');
+      console.log('✅ Token Expo registrado en backend');
       return response.data;
     } catch (error) {
-      console.error('❌ Error registrando FCM token:', error);
+      console.error('❌ Error registrando Expo token:', error);
       throw error;
     }
   }
@@ -209,7 +160,7 @@ export class PushNotificationService {
     avisarmeCierres: boolean = true
   ) {
     try {
-      const { api } = await import('../client');
+      const { api } = await import('./client');
       
       const response = await api.post('/push/prefs', {
         userId,
@@ -231,13 +182,13 @@ export class PushNotificationService {
   /**
    * Desregistrar token del backend
    */
-  static async unregisterToken(userId: string, fcmToken: string) {
+  static async unregisterToken(userId: string, expoPushToken: string) {
     try {
-      const { api } = await import('../client');
+      const { api } = await import('./client');
       
       const response = await api.post('/push/unregister', {
         userId,
-        expoPushToken: fcmToken,
+        expoPushToken,
       });
 
       console.log('✅ Token desregistrado del backend');
@@ -253,24 +204,22 @@ export class PushNotificationService {
    */
   static async initialize() {
     try {
-      console.log('🚀 Inicializando servicio de notificaciones FCM...');
+      console.log('🚀 Inicializando servicio de notificaciones Expo...');
       
       // Configurar canal de Android
       await this.configureAndroidChannel();
       
       // Configurar handlers
       this.configureForegroundListener();
-      this.configureBackgroundListener();
-      this.configureForegroundMessageListener();
       
       // Obtener token
-      const fcmToken = await this.getFCMToken();
+      const expoToken = await this.getExpoToken();
       
-      if (fcmToken) {
+      if (expoToken) {
         console.log('✅ Servicio de notificaciones inicializado');
-        return fcmToken;
+        return expoToken;
       } else {
-        console.log('⚠️ No se pudo obtener el token FCM');
+        console.log('⚠️ No se pudo obtener el token Expo');
         return null;
       }
     } catch (error) {
@@ -280,30 +229,9 @@ export class PushNotificationService {
   }
 
   /**
-   * Refrescar token (útil para manejar cambios de token)
-   * @returns Función para desuscribir el listener
+   * Mock para compatibilidad anterior (Expo no tiene refresh listener directo como FCM)
    */
   static setupTokenRefreshListener() {
-    return messaging().onTokenRefresh(async (newToken) => {
-      console.log('🔄 Token FCM actualizado:', newToken.substring(0, 30) + '...');
-
-      // Guardar nuevo token
-      await AsyncStorage.setItem('fcm_token', newToken);
-
-      // Re-registrar en backend
-      try {
-        const userStr = await AsyncStorage.getItem('user');
-        if (userStr) {
-          const user = JSON.parse(userStr);
-          const userId = user.usuario_uuid;
-
-          if (userId) {
-            await this.registerToken(userId, newToken);
-          }
-        }
-      } catch (error) {
-        console.error('❌ Error re-registrando token actualizado:', error);
-      }
-    });
+    return () => {};
   }
 }

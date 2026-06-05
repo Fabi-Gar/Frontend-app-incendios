@@ -1,5 +1,5 @@
 // services/catalogos.ts
-import { api } from '../client'
+import { api } from './client'
 
 /* ============================
  * Tipos base

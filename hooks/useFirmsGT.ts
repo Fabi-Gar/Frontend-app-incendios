@@ -1,7 +1,7 @@
 // hooks/useFirmsGT.ts
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '@/client';
+import { api } from '@/services/client';
 import { WeightedLatLng, probabilityFromConfidence } from '@/app/utils/map';
 
 const AS_FIRMS_ENABLED = 'firms_enabled';

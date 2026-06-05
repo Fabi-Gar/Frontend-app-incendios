@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Image } from 'react-native';
 import { ActivityIndicator } from 'react-native-paper';
-import { getFirstPhotoUrl } from '@/services/photos';
+import { getFirstPhotoUrlByIncendio } from '@/services/photos';
 import { getPhotoCache, setPhotoCache } from '@/hooks/photoCache';
 
 const placeholder = require('@/assets/placeholder_incendio.png');
@@ -20,7 +20,7 @@ export default function PhotoInCallout({ incendioId, width = 210, height = 110, 
     if (url === undefined) {
       (async () => {
         try {
-          const u = await getFirstPhotoUrl(incendioId);
+          const u = await getFirstPhotoUrlByIncendio(incendioId);
           if (!mounted) return;
           setUrl(u);
           setPhotoCache(incendioId, u);

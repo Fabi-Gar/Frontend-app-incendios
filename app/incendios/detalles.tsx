@@ -6,8 +6,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { getIncendio, Incendio, aprobarIncendio, rechazarIncendio, getHistorialEstados, HistorialEstado } from '@/services/incendios';
-import { api } from '@/client';
-import { getUser } from '@/session';
+import { api } from '@/services/client';
+import { getUser } from '@/services/session';
 import { subscribe, EVENTS } from '@/hooks/events';
 import { showToast } from '@/hooks/uiStore';
 
@@ -101,7 +101,8 @@ export default function DetalleIncendio() {
         setHistorial([]);
       }
     } catch (e: any) {
-      showToast({ type: 'error', message: e?.response?.data?.error || 'No se pudo cargar el incendio' });
+      const errMsg = e?.response?.data?.error?.message || e?.response?.data?.error || e?.message || 'No se pudo cargar el incendio';
+      showToast({ type: 'error', message: typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg) });
     } finally {
       setLoading(false);
       setDataReady(true);
@@ -188,11 +189,13 @@ export default function DetalleIncendio() {
     if (lat != null && lon != null) {
       rows.push({ id: 'coord', title: 'Coordenadas', text: `${lat.toFixed(6)}, ${lon.toFixed(6)}` });
     }
-    if ((item as any)?.departamento?.nombre) {
-      rows.push({ id: 'depto', title: 'Departamento', text: (item as any).departamento.nombre });
+    const depto = (item as any)?.departamento?.nombre || (item as any)?.inab_departamento;
+    if (depto) {
+      rows.push({ id: 'depto', title: 'Departamento', text: depto });
     }
-    if ((item as any)?.municipio?.nombre) {
-      rows.push({ id: 'muni', title: 'Municipio', text: (item as any).municipio.nombre });
+    const muni = (item as any)?.municipio?.nombre || (item as any)?.inab_municipio;
+    if (muni) {
+      rows.push({ id: 'muni', title: 'Municipio', text: muni });
     }
     if ((item as any)?.lugar_poblado) {
       rows.push({ id: 'lugar', title: 'Lugar poblado', text: (item as any).lugar_poblado });
@@ -206,6 +209,27 @@ export default function DetalleIncendio() {
     if ((item as any)?.telefono) {
       rows.push({ id: 'tel', title: 'Teléfono', text: (item as any).telefono });
     }
+    
+    // --- NUEVOS CAMPOS INAB ---
+    if ((item as any)?.inab_tipo_incendio) {
+      rows.push({ id: 'inab_tipo', title: 'Tipo de Incendio', text: (item as any).inab_tipo_incendio });
+    }
+    if ((item as any)?.inab_estado_aviso) {
+      rows.push({ id: 'inab_estado', title: 'Estatus', text: (item as any).inab_estado_aviso });
+    }
+    if ((item as any)?.inab_institucion) {
+      rows.push({ id: 'inab_inst', title: 'Institución a cargo', text: (item as any).inab_institucion });
+    }
+    if ((item as any)?.inab_region) {
+      rows.push({ id: 'inab_region', title: 'Región (INAB)', text: (item as any).inab_region });
+    }
+    if ((item as any)?.inab_subregion) {
+      rows.push({ id: 'inab_subregion', title: 'Subregión (INAB)', text: (item as any).inab_subregion });
+    }
+    if ((item as any)?.inab_link_googlemaps) {
+      rows.push({ id: 'inab_link', title: 'Google Maps', text: (item as any).inab_link_googlemaps });
+    }
+    // --------------------------
 
     const reportadoEn = f((item as any).reportado_en || null);
     if (reportadoEn) {
@@ -394,15 +418,15 @@ export default function DetalleIncendio() {
     );
   }
 
-  // KPIs del reporte inicial (ahora en el incendio)
-  const repDepto = (item as any)?.departamento?.nombre || '—';
-  const repMuni  = (item as any)?.municipio?.nombre || '—';
-  const repFecha = (item as any)?.reportado_en ? new Date((item as any).reportado_en).toLocaleString() : '—';
-  const repMedio = (item as any)?.medio?.nombre || '—';
+  // KPIs del reporte inicial (ahora en el incendio) o fallback de INAB
+  const repDepto = (item as any)?.departamento?.nombre || (item as any)?.inab_departamento || '-';
+  const repMuni  = (item as any)?.municipio?.nombre || (item as any)?.inab_municipio || '-';
+  const repFecha = (item as any)?.reportado_en ? new Date((item as any).reportado_en).toLocaleString() : ((item as any)?.inab_fecha_hora ? new Date((item as any).inab_fecha_hora).toLocaleString() : '-');
+  const repMedio = (item as any)?.medio?.nombre || ((item as any)?.inab_objectid ? 'INAB (Sincronizado vía API)' : 'App (Reporte interno)');
 
   const repUsuario = (item as any)?.reportado_por || (item as any)?.creado_por || (item as any)?.creadoPor || null;
-  const repNombre = [repUsuario?.nombre, repUsuario?.apellido].filter(Boolean).join(' ') || (item as any)?.reportado_por_nombre || '—';
-  const repInstit = (item as any)?.institucion_reporte?.nombre || (repUsuario?.institucion?.nombre ?? '—');
+  const repNombre = (item as any)?.inab_reportado_por || [repUsuario?.nombre, repUsuario?.apellido].filter(Boolean).join(' ') || (item as any)?.reportado_por_nombre || '—';
+  const repInstit = (item as any)?.inab_institucion || (item as any)?.institucion_reporte?.nombre || (repUsuario?.institucion?.nombre ?? '—');
   const repTel = (item as any)?.telefono ?? repUsuario?.telefono ?? '—';
 
   const Row = ({ label, value }: { label: string; value?: string | null }) => (
@@ -452,6 +476,13 @@ export default function DetalleIncendio() {
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{item.titulo}</Text>
+            {/* Etiqueta de procedencia */}
+            {!(item as any)?.inab_objectid && !(item as any)?.inab_globalid && (
+              <View style={{ backgroundColor: '#E3F2FD', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start', marginTop: 4 }}>
+                <Text style={{ color: '#1565C0', fontSize: 12, fontWeight: 'bold' }}>📱 Reporte App</Text>
+              </View>
+            )}
+            
             {/* Badge de estado de aprobación */}
             {item.aprobado && (
               <View style={{ backgroundColor: '#E8F5E9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start', marginTop: 4 }}>

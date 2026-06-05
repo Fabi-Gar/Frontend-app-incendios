@@ -1,5 +1,5 @@
 // services/uploads.ts
-import { api } from '@/client';
+import { api } from './client';
 
 type RNFile = { uri: string; name: string; type: string };
 
@@ -14,10 +14,10 @@ export async function uploadReporteFoto(
   if (credito) fd.append('credito', credito);
 
   const { data } = await api.post(`/reportes/${reporte_uuid}/fotos`, fd, {
-    transformRequest: (x) => x,
+    transformRequest: (x: any) => x,
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 60000,
-    onUploadProgress: (pe) => {
+    onUploadProgress: (pe: any) => {
       if (pe.total && onProgress) onProgress(pe.loaded / pe.total);
     },
   });

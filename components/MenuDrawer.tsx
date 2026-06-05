@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { clearToken } from '../session';
+import { clearToken } from '../services/session';
 import { router } from 'expo-router';
 
 export const MENU_DRAWER_WIDTH = Dimensions.get('window').width * 0.7;
@@ -51,11 +51,6 @@ export const MenuDrawer = ({ animation, onClose, onNavigate, isAdmin = false, is
       <TouchableOpacity style={styles.option} onPress={() => onNavigate('Mi Usuario')}>
         <Ionicons name="person-circle" size={20} color="#37474F" style={styles.icon} />
         <Text style={styles.optionText}>Mi perfil</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.option} onPress={() => onNavigate('Reportes')}>
-        <Ionicons name="document-text" size={20} color="#37474F" style={styles.icon} />
-        <Text style={styles.optionText}>Mis reportes</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.option} onPress={() => onNavigate('notificaciones')}>

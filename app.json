@@ -9,7 +9,6 @@
     "newArchEnabled": true,
     "plugins": [
       "expo-router",
-      "@react-native-firebase/app",
       "expo-notifications",
       "expo-web-browser"
     ],
@@ -22,8 +21,7 @@
       },
       "infoPlist": {
         "NSAppTransportSecurity": { "NSAllowsArbitraryLoads": true }
-      },
-      "googleServicesFile": "./GoogleService-Info.plist"
+      }
     },
 
     "android": {
@@ -45,7 +43,6 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",

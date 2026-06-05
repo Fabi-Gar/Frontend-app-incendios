@@ -1,5 +1,5 @@
 // services/usuarios.ts
-import { api } from '../client';
+import { api } from './client';
 
 export type UUID = string;
 

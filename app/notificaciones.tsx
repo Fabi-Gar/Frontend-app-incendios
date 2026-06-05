@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, View, StyleSheet, RefreshControl } from 'react-native';
 import { Text, Card, ActivityIndicator, Button, Chip } from 'react-native-paper';
 import { Stack } from 'expo-router';
-import { api } from '@/client';
+import { api } from '@/services/client';
 
 interface Notificacion {
   notificacion_uuid: string;

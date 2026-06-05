@@ -105,7 +105,7 @@ export default function IncendiosSinAprobar() {
           {
             text: 'Rechazar',
             style: 'destructive',
-            onPress: async (motivo) => {
+            onPress: async (motivo?: string) => {
               const motivoFinal = motivo?.trim() || 'Sin motivo especificado';
               try {
                 await rechazarIncendio(item.id, motivoFinal);
@@ -125,7 +125,7 @@ export default function IncendiosSinAprobar() {
 
   const renderItem = ({ item }: { item: Incendio }) => {
     const fecha = item.creadoEn ? new Date(item.creadoEn).toLocaleString() : '—';
-    const creador = [item.creadoPor?.nombre, item.creadoPor?.apellido].filter(Boolean).join(' ') || 'Desconocido';
+    const creador = item.creadoPor?.nombre || 'Desconocido';
 
     return (
       <View style={styles.card}>
@@ -133,7 +133,14 @@ export default function IncendiosSinAprobar() {
           onPress={() => router.push(`/incendios/detalles?id=${item.id}` as any)}
           style={{ flex: 1 }}
         >
-          <Text style={styles.titulo}>{item.titulo}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <Text style={styles.titulo}>{item.titulo}</Text>
+            {!(item as any)?.inab_objectid && !(item as any)?.inab_globalid && (
+              <View style={{ backgroundColor: '#E3F2FD', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                <Text style={{ color: '#1565C0', fontSize: 10, fontWeight: 'bold' }}>📱 App</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.meta}>Creado por: {creador}</Text>
           <Text style={styles.meta}>Fecha: {fecha}</Text>
           {item.descripcion && <Text style={styles.desc} numberOfLines={2}>{item.descripcion}</Text>}

@@ -3,8 +3,8 @@ import { ScrollView, View, Alert } from 'react-native';
 import { Text, Switch, Button, Divider, Chip, ActivityIndicator, IconButton } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 
-import { api } from '@/client';
-import { getUser } from '@/session';
+import { api } from '@/services/client';
+import { getUser } from '@/services/session';
 import { listDepartamentos, listMunicipios, Departamento, Municipio } from '@/services/catalogos';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PushNotificationService } from '@/services/pushNotificationService';

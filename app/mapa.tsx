@@ -25,8 +25,8 @@ import EmptyState from '@/components/EmptyState';
 import { MapTypeDrawer, DRAWER_WIDTH } from '@/components/MapTypeDrawer';
 import { MenuDrawer } from '@/components/MenuDrawer';
 
-import { api } from '@/client';
-import { getUser } from '@/session';
+import { api } from '@/services/client';
+import { getUser } from '@/services/session';
 import { useIncendiosForMap } from '../hooks/useIncendiosForMap';
 import { useFirmsGT } from '../hooks/useFirmsGT';
 import { useMapRegion } from '../hooks/useMapRegion';
@@ -34,6 +34,8 @@ import { getLatLngFromIncendio } from '@/app/utils/map';
 import { isAdminUser, isInstitucionUser } from './utils/roles';
 import { getFirstPhotoUrlByIncendio } from '@/services/photos';
 import { cierreColor } from '@/app/utils/estadoCierre';
+import { PreviewCard } from '@/components/map/PreviewCard';
+import { MapMarkers } from '@/components/map/MapMarkers';
 
 // ========================================
 // CONSTANTS
@@ -560,54 +562,29 @@ export default function Mapa() {
     return showIncendios ? items : [];
   }, [items, showIncendios]);
 
-  const renderMarkers = () => (
-    <>
-      {itemsFiltrados.map((item: any) => {
-        const coord = getLatLngFromIncendio(item);
-        if (!coord) return null;
+  const handleMarkerPress = async (id: string, item: any, coord: LatLng) => {
+    try {
+      const point = await mapRef.current?.pointForCoordinate(coord);
+      const pt = point || { x: screen.width / 2, y: screen.height / 2 };
 
-        const id = String(item.id ?? item.incendio_uuid);
-        const estado = item?.estadoActual?.estado?.nombre || 'Reportado';
-        const color = cierreColor(estado);
+      debounceTap(() => setPreview({ id, item, pt }));
 
-        const handleMarkerPress = async () => {
-          try {
-            const point = await mapRef.current?.pointForCoordinate(coord as LatLng);
-            const pt = point || { x: screen.width / 2, y: screen.height / 2 };
-
-            debounceTap(() => setPreview({ id, item, pt }));
-
-            Promise.all([
-              ensureReportante(id, item),
-              (async () => {
-                const cached = metaCacheRef.current.covers[id] || getCoverUrl(item);
-                if (!cached) {
-                  const resolved = await ensureCoverUrl(id, item);
-                  if (resolved) setPreview(prev => (prev && prev.id === id ? { ...prev } : prev));
-                }
-              })()
-            ]).catch(err => {
-              console.error('[handleMarkerPress] Error en fetch background:', err);
-            });
-          } catch (err) {
-            console.error('[handleMarkerPress] Error:', err);
+      Promise.all([
+        ensureReportante(id, item),
+        (async () => {
+          const cached = metaCacheRef.current.covers[id] || getCoverUrl(item);
+          if (!cached) {
+            const resolved = await ensureCoverUrl(id, item);
+            if (resolved) setPreview(prev => (prev && prev.id === id ? { ...prev } : prev));
           }
-        };
-
-        return (
-          <Marker
-            key={`${id}-${estado}`}
-            coordinate={coord}
-            pinColor={color}
-            tracksViewChanges={trackViews}
-            zIndex={9999}
-            onPress={handleMarkerPress}
-            anchor={{ x: 0.5, y: 1 }}
-          />
-        );
-      })}
-    </>
-  );
+        })()
+      ]).catch(err => {
+        console.error('[handleMarkerPress] Error en fetch background:', err);
+      });
+    } catch (err) {
+      console.error('[handleMarkerPress] Error:', err);
+    }
+  };
 
   // ========================================
   // REFRESH HANDLERS
@@ -647,6 +624,14 @@ export default function Mapa() {
         zIndex: 4 
       }} />
 
+      {Platform.OS === 'web' ? (
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#e0e0e0', alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={{ fontSize: 18, color: '#555', textAlign: 'center', padding: 20 }}>
+            El mapa interactivo no está disponible en la versión web.{'\n'}
+            (Requiere configuración de API Key web o fallback).
+          </Text>
+        </View>
+      ) : (
       <MapView
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
@@ -696,8 +681,15 @@ export default function Mapa() {
           );
         })}
 
-        {showIncendios && renderMarkers()}
+        {showIncendios && (
+          <MapMarkers 
+            items={itemsFiltrados} 
+            trackViews={trackViews} 
+            onMarkerPress={handleMarkerPress} 
+          />
+        )}
       </MapView>
+      )}
 
       {(loading || firmsLoading) && (
         <View style={styles.loaderOverlay}>
@@ -710,7 +702,6 @@ export default function Mapa() {
 
       {preview && (() => {
         const { id, item, pt } = preview;
-        const estado = (item as any)?.estadoActual?.estado?.nombre || 'Reportado';
         const publicadoPor =
           reportantes[id] ||
           (() => {
@@ -732,76 +723,17 @@ export default function Mapa() {
           }
         })() : null;
 
-        const left = Math.max(8, Math.min(pt.x - PREVIEW_CARD_WIDTH / 2, screen.width - PREVIEW_CARD_WIDTH - 8));
-        const top = Math.max((insets.top || 0) + 90, pt.y - PREVIEW_CARD_HEIGHT - 16);
-
         return (
-          <>
-            <TouchableWithoutFeedback onPress={() => setPreview(null)}>
-              <View style={styles.previewOverlayBehind} />
-            </TouchableWithoutFeedback>
-
-            <View
-              style={[styles.previewCard, {
-                left, 
-                top, 
-                width: PREVIEW_CARD_WIDTH,
-              }]}
-              collapsable={false}
-              renderToHardwareTextureAndroid
-              needsOffscreenAlphaCompositing
-            >
-              <Text style={{ fontWeight: 'bold', fontSize: 15 }}>
-                {(item as any).titulo || 'Sin título'}
-              </Text>
-
-              <TouchableOpacity
-                accessibilityRole="imagebutton"
-                accessibilityLabel="Ver foto a pantalla completa"
-                activeOpacity={0.85}
-                onPress={() => {
-                  try {
-                    if (cover) setViewer({ visible: true, urls: [cover], index: 0 });
-                  } catch (err) {
-                    console.error('[Preview] Error al abrir imagen:', err);
-                  }
-                }}
-                style={{ marginTop: 6 }}
-              >
-                <Image
-                  source={cover ? { uri: cover } : require('@/assets/images/placeholder_incendio.png')}
-                  style={{ width: '100%', height: 110, borderRadius: 8 }}
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
-
-              <Text style={{ marginTop: 6 }} numberOfLines={2}>
-                {(item as any).descripcion || 'Sin descripción'}
-              </Text>
-
-              <Text style={{ marginTop: 4, color: '#666', fontSize: 12 }}>
-                {`Publicado por: ${publicadoPor || (reportantes[id] ? '' : '…')}`}
-              </Text>
-              <Text style={{ color: '#777', fontSize: 12, marginTop: 2 }}>
-                {`Estado: ${estado}`}
-              </Text>
-
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                <TouchableOpacity
-                  onPress={() => {
-                    try {
-                      router.push(`/incendios/detalles?id=${id}`);
-                    } catch (err) {
-                      console.error('[Preview] Error al navegar:', err);
-                    }
-                  }}
-                  style={[styles.cardBtn, { backgroundColor: '#E8F5E9' }]}
-                >
-                  <Text style={{ fontWeight: '600', color: '#2E7D32' }}>Detalles</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </>
+          <PreviewCard
+            id={id}
+            item={item}
+            pt={pt}
+            insetsTop={insets.top || 0}
+            reportante={publicadoPor || (reportantes[id] ? '' : '…')}
+            coverUrl={cover}
+            onClose={() => setPreview(null)}
+            onOpenViewer={(url) => setViewer({ visible: true, urls: [url], index: 0 })}
+          />
         );
       })()}
 
@@ -852,6 +784,7 @@ export default function Mapa() {
           </Text>
         </View>
 
+        {/* 
         <TouchableOpacity
           onPress={() => {
             try {
@@ -872,6 +805,7 @@ export default function Mapa() {
         >
           <Ionicons name="add" size={24} color="#fff" />
         </TouchableOpacity>
+        */}
       </View>
 
       <View style={[styles.rightButtons, { top: (insets.top || 0) + 120 }]}>
@@ -1014,7 +948,8 @@ export default function Mapa() {
           <EmptyState
             title="No hay incendios para mostrar"
             subtitle="Ajusta los filtros o visibilidad para ver resultados."
-            actionLabel={isAdmin ? 'Crear reporte aquí' : undefined}
+            // actionLabel={isAdmin ? 'Crear reporte aquí' : undefined}
+            actionLabel={undefined}
             onAction={() => {
               try {
                 if (isAdmin) {

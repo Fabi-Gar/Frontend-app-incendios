@@ -1,5 +1,5 @@
 // services/incendios.ts
-import { api } from '../client';
+import { api } from './client';
 
 /** ---------- Tipos compartidos (UUID en todas las IDs) ---------- */
 export type UsuarioRef = {
@@ -78,6 +78,22 @@ export type Incendio = {
   medio?: { id: string; nombre: string } | null;
   telefono?: string | null;
   reportado_en?: string | null;
+
+  // --- Datos de INAB (Sincronización) ---
+  inab_objectid?: number | null;
+  inab_globalid?: string | null;
+  inab_tipo_incendio?: string | null;
+  inab_estado_aviso?: string | null;
+  inab_departamento?: string | null;
+  inab_municipio?: string | null;
+  inab_region?: string | null;
+  inab_subregion?: string | null;
+  inab_institucion?: string | null;
+  inab_reportado_por?: string | null;
+  inab_fecha_hora?: string | null;
+  inab_link_googlemaps?: string | null;
+  inab_coordenada_x?: number | null;
+  inab_coordenada_y?: number | null;
 };
 
 export type Paginated<T> = {
@@ -306,6 +322,22 @@ function fromBackendIncendio(raw: any): Incendio {
     medio: raw?.medio ?? null,
     telefono: getStr(raw, ['telefono']) ?? null,
     reportado_en: getDateLike(raw, ['reportado_en', 'reportadoEn']) ?? null,
+
+    // --- Datos INAB ---
+    inab_objectid: raw?.inab_objectid ?? null,
+    inab_globalid: raw?.inab_globalid ?? null,
+    inab_tipo_incendio: raw?.inab_tipo_incendio ?? null,
+    inab_estado_aviso: raw?.inab_estado_aviso ?? null,
+    inab_departamento: raw?.inab_departamento ?? null,
+    inab_municipio: raw?.inab_municipio ?? null,
+    inab_region: raw?.inab_region ?? null,
+    inab_subregion: raw?.inab_subregion ?? null,
+    inab_institucion: raw?.inab_institucion ?? null,
+    inab_reportado_por: raw?.inab_reportado_por ?? null,
+    inab_fecha_hora: raw?.inab_fecha_hora ?? null,
+    inab_link_googlemaps: raw?.inab_link_googlemaps ?? null,
+    inab_coordenada_x: raw?.inab_coordenada_x ?? null,
+    inab_coordenada_y: raw?.inab_coordenada_y ?? null,
   };
 
   // ⬇️ Inyectar foto suelta si el backend la incluyó (de /with-reporte multipart)

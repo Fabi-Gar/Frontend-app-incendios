@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { getToken, logout } from '../session';
+import { getToken, logout } from '../services/session';
 
 // Función para validar si el token JWT no ha expirado
 async function isTokenValid(): Promise<boolean> {

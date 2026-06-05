@@ -64,7 +64,7 @@ export async function registerForPushIfNeeded(opts: {
   await pushRegister({
     userId: opts.userId,
     expoPushToken: token,
-    regionesSuscritas: opts.regionesSuscritas,
+    departamentosSuscritos: opts.regionesSuscritas,
     avisarmeAprobado: opts.avisarmeAprobado,
   });
   // Si quieres, guarda el token en algún storage para mostrar en depuración

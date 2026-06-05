@@ -38,7 +38,9 @@ export default function GlobalToast() {
           color={config.iconColor} 
           style={styles.icon}
         />
-        <Text style={styles.text}>{toast.message}</Text>
+        <Text style={styles.text}>
+          {typeof toast.message === 'string' ? toast.message : (toast.message as any)?.message || JSON.stringify(toast.message)}
+        </Text>
       </View>
     </Snackbar>
   );

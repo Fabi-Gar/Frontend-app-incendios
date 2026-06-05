@@ -1,4 +1,4 @@
-import { api } from '../client';
+import { api } from './client';
 
 // Tipos para Plantillas de Cierre
 export type CierrePlantilla = {

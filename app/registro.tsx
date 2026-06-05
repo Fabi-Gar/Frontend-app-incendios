@@ -13,8 +13,8 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { router } from 'expo-router';
-import { api } from '@/client';
-import { saveToken, saveUser } from '@/session';
+import { api } from '@/services/client';
+import { saveToken, saveUser } from '@/services/session';
 
 const RegisterSchema = Yup.object().shape({
   nombre: Yup.string().required('Requerido'),

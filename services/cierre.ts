@@ -1,5 +1,5 @@
 // services/cierre.ts
-import { api } from '@/client';
+import { api } from './client';
 
 // Tipos para el sistema de cierre dinámico
 export type TipoCampo =

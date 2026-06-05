@@ -23,8 +23,8 @@ import { useRouter } from 'expo-router';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { api } from '@/client';
-import { getUser as getUserLocal, saveUser as saveUserLocal } from '@/session';
+import { api } from '@/services/client';
+import { getUser as getUserLocal, saveUser as saveUserLocal } from '@/services/session';
 
 type Rol = { rol_uuid: string; nombre: string; descripcion?: string | null };
 type MeResponse = {

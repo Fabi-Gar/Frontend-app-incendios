@@ -1,5 +1,5 @@
 // services/push.ts
-import { api } from '../client';
+import { api } from './client';
 
 /**
  * Registrar token FCM y preferencias en el backend

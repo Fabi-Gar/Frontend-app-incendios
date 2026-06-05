@@ -1,5 +1,5 @@
 // src/services/fotos.ts
-import { api } from '../client';
+import { api } from './client';
 
 export async function getFirstPhotoUrlByIncendio(incendio_uuid: string): Promise<string | null> {
   try {
