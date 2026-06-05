@@ -766,6 +766,7 @@ export default function Mapa() {
         onNavigate={handleMenuNavigate}
         isAdmin={isAdmin}
         isInstitucion={isInstitucion}
+        isLoggedIn={!!currentUser}
       />
 
       <View style={[styles.header, { paddingTop: insets.top + 12, paddingBottom: 15 }]}>

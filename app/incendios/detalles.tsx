@@ -14,9 +14,7 @@ import { showToast } from '@/hooks/uiStore';
 // NUEVO: mismo helper usado en el mapa para resolver portada
 import { getFirstPhotoUrlByIncendio } from '@/services/photos';
 
-// Sistema de cierre dinámico con plantillas
-import FormularioCierre from '@/components/FormularioCierre';
-import { getFormularioCierre, FormularioCierre as FormularioCierreType } from '@/services/cierre';
+// import { getFormularioCierre, FormularioCierre as FormularioCierreType } from '@/services/cierre';
 
 type Tab = 'ACT' | 'REP' | 'INFO';
 
@@ -40,9 +38,7 @@ export default function DetalleIncendio() {
   const [siguiendo, setSiguiendo] = useState(false);
   const [loadingSeguir, setLoadingSeguir] = useState(false);
 
-  // Estado para cierre dinámico
-  const [formularioCierre, setFormularioCierre] = useState<FormularioCierreType | null>(null);
-  const [cierreModalVisible, setCierreModalVisible] = useState(false);
+
 
   // Estado para historial de cambios
   const [historial, setHistorial] = useState<HistorialEstado[]>([]);
@@ -83,14 +79,7 @@ export default function DetalleIncendio() {
       const data = await getIncendio(String(id));
       setItem(data);
 
-      // Formulario de cierre dinámico
-      try {
-        const formCierre = await getFormularioCierre(String(id));
-        setFormularioCierre(formCierre);
-      } catch (err) {
-        // Si no hay formulario, no pasa nada
-        setFormularioCierre(null);
-      }
+
 
       // Historial de cambios de estado
       try {
@@ -180,70 +169,61 @@ export default function DetalleIncendio() {
     const lat = (item as any)?.lat ?? item?.ubicacion?.coordinates?.[1] ?? (item as any)?.centroide?.coordinates?.[1];
     const lon = (item as any)?.lng ?? (item as any)?.lon ?? item?.ubicacion?.coordinates?.[0] ?? (item as any)?.centroide?.coordinates?.[0];
 
-    if (item.titulo) {
-      rows.push({ id: 'titulo', title: 'Título', text: item.titulo });
-    }
-    if (item.descripcion) {
-      rows.push({ id: 'desc', title: 'Descripción', text: item.descripcion });
-    }
-    if (lat != null && lon != null) {
-      rows.push({ id: 'coord', title: 'Coordenadas', text: `${lat.toFixed(6)}, ${lon.toFixed(6)}` });
-    }
-    const depto = (item as any)?.departamento?.nombre || (item as any)?.inab_departamento;
-    if (depto) {
-      rows.push({ id: 'depto', title: 'Departamento', text: depto });
-    }
-    const muni = (item as any)?.municipio?.nombre || (item as any)?.inab_municipio;
-    if (muni) {
-      rows.push({ id: 'muni', title: 'Municipio', text: muni });
-    }
-    if ((item as any)?.lugar_poblado) {
-      rows.push({ id: 'lugar', title: 'Lugar poblado', text: (item as any).lugar_poblado });
-    }
-    if ((item as any)?.finca) {
-      rows.push({ id: 'finca', title: 'Finca', text: (item as any).finca });
-    }
-    if ((item as any)?.medio?.nombre) {
-      rows.push({ id: 'medio', title: 'Medio de reporte', text: (item as any).medio.nombre });
-    }
-    if ((item as any)?.telefono) {
-      rows.push({ id: 'tel', title: 'Teléfono', text: (item as any).telefono });
-    }
+    // Básico
+    if (item.titulo) rows.push({ id: 'titulo', title: 'Título', text: item.titulo });
+    if (item.descripcion) rows.push({ id: 'desc', title: 'Descripción', text: item.descripcion });
+    if (lat != null && lon != null) rows.push({ id: 'coord', title: 'Coordenadas', text: `${lat.toFixed(6)}, ${lon.toFixed(6)}` });
     
-    // --- NUEVOS CAMPOS INAB ---
-    if ((item as any)?.inab_tipo_incendio) {
-      rows.push({ id: 'inab_tipo', title: 'Tipo de Incendio', text: (item as any).inab_tipo_incendio });
-    }
-    if ((item as any)?.inab_estado_aviso) {
-      rows.push({ id: 'inab_estado', title: 'Estatus', text: (item as any).inab_estado_aviso });
-    }
-    if ((item as any)?.inab_institucion) {
-      rows.push({ id: 'inab_inst', title: 'Institución a cargo', text: (item as any).inab_institucion });
-    }
-    if ((item as any)?.inab_region) {
-      rows.push({ id: 'inab_region', title: 'Región (INAB)', text: (item as any).inab_region });
-    }
-    if ((item as any)?.inab_subregion) {
-      rows.push({ id: 'inab_subregion', title: 'Subregión (INAB)', text: (item as any).inab_subregion });
-    }
-    if ((item as any)?.inab_link_googlemaps) {
-      rows.push({ id: 'inab_link', title: 'Google Maps', text: (item as any).inab_link_googlemaps });
-    }
-    // --------------------------
+    // Localización
+    const loc = (item as any)?.localizacion;
+    if (loc?.departamento?.nombre) rows.push({ id: 'depto', title: 'Departamento', text: loc.departamento.nombre });
+    if (loc?.municipio?.nombre) rows.push({ id: 'muni', title: 'Municipio', text: loc.municipio.nombre });
+    if (loc?.lugar_poblado) rows.push({ id: 'lugar', title: 'Lugar poblado', text: loc.lugar_poblado });
+    if (loc?.finca) rows.push({ id: 'finca', title: 'Finca', text: loc.finca });
+    
+    // Control
+    const ctrl = (item as any)?.control;
+    if (ctrl?.es_forestal !== undefined) rows.push({ id: 'forestal', title: '¿Es forestal?', text: ctrl.es_forestal ? 'Sí' : 'No' });
+    if (ctrl?.area_estimada_ha) rows.push({ id: 'area', title: 'Área estimada (ha)', text: String(ctrl.area_estimada_ha) });
+    if (ctrl?.area_dentro_ap_ha) rows.push({ id: 'area_ap', title: 'Dentro de AP (ha)', text: String(ctrl.area_dentro_ap_ha) });
+    if (ctrl?.area_fuera_ap_ha) rows.push({ id: 'area_fuera', title: 'Fuera de AP (ha)', text: String(ctrl.area_fuera_ap_ha) });
+    if (ctrl?.metodo_control) rows.push({ id: 'metodo_ctrl', title: 'Método de control', text: ctrl.metodo_control });
 
+    // Vegetación
+    const veg = (item as any)?.vegetacion;
+    if (veg) {
+      const vTypes = [
+        { label: 'Conífera', val: veg.conifera_ha },
+        { label: 'Latifoliada', val: veg.latifoliado_ha },
+        { label: 'Mixto', val: veg.mixto_ha },
+        { label: 'Manglar', val: veg.manglar_ha },
+        { label: 'Pastizal', val: veg.pastizal_ha },
+        { label: 'Humedal', val: veg.humedal_ha },
+        { label: 'Pajonal', val: veg.pajonal_ha },
+        { label: 'Sabana', val: veg.sabana_ha },
+        { label: 'Guamil', val: veg.guamil_ha }
+      ];
+      vTypes.forEach(t => {
+        if (t.val > 0) rows.push({ id: `veg_${t.label}`, title: `Vegetación: ${t.label}`, text: `${t.val} ha` });
+      });
+      if (veg.observaciones) rows.push({ id: 'veg_obs', title: 'Observaciones vegetación', text: veg.observaciones });
+    }
+
+    // Meteorología
+    const met = (item as any)?.meteorologia;
+    if (met) {
+      if (met.temperatura_c != null) rows.push({ id: 'met_temp', title: 'Temperatura', text: `${met.temperatura_c}°C` });
+      if (met.humedad_relativa != null) rows.push({ id: 'met_hum', title: 'Humedad relativa', text: `${met.humedad_relativa}%` });
+      if (met.velocidad_viento_kmh != null) rows.push({ id: 'met_viento', title: 'Vel. Viento', text: `${met.velocidad_viento_kmh} km/h` });
+      if (met.direccion_viento) rows.push({ id: 'met_dir', title: 'Dir. Viento', text: met.direccion_viento });
+    }
+
+    // Fechas
     const reportadoEn = f((item as any).reportado_en || null);
-    if (reportadoEn) {
-      rows.push({ id: 'reportado', title: 'Reportado en', text: reportadoEn });
-    }
+    if (reportadoEn) rows.push({ id: 'reportado', title: 'Reportado en', text: reportadoEn });
     const creadoEn = f((item as any).creadoEn || (item as any).creado_en || null);
-    if (creadoEn) {
-      rows.push({ id: 'creado', title: 'Creado en', text: creadoEn });
-    }
-    const aprobadoEn = f((item as any).aprobadoEn || (item as any).aprobado_en || null);
-    if (aprobadoEn) {
-      rows.push({ id: 'aprob_en', title: 'Aprobado en', text: aprobadoEn });
-    }
-
+    if (creadoEn) rows.push({ id: 'creado', title: 'Creado en', text: creadoEn });
+    
     return rows;
   }, [item, isAprobado]);
 
@@ -642,60 +622,13 @@ export default function DetalleIncendio() {
                 ))}
               </View>
 
-              {/* Sección de cierre dinámico */}
-              {puedeModerarse && formularioCierre && (
-                <View style={{ marginTop: 16 }}>
-                  <Text style={styles.sectionTitle}>Formulario de Cierre</Text>
 
-                  {formularioCierre.extinguido && (
-                    <View style={{ backgroundColor: '#E8F5E9', padding: 12, borderRadius: 8, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: '#2E7D32' }}>
-                      <Text style={{ color: '#2E7D32', fontWeight: 'bold' }}>✓ Incendio Extinguido</Text>
-                    </View>
-                  )}
-
-                  <Button
-                    mode="contained"
-                    onPress={() => setCierreModalVisible(true)}
-                    style={{ marginBottom: 12 }}
-                  >
-                    {formularioCierre.extinguido ? 'Ver datos de cierre' : 'Completar formulario de cierre'}
-                  </Button>
-
-                  {/* Resumen de respuestas */}
-                  <View style={styles.card}>
-                    <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8 }}>
-                      {formularioCierre.plantilla.nombre}
-                    </Text>
-                    {formularioCierre.secciones.map((seccion) => {
-                      const respuestasCompletas = seccion.campos.filter((c) => c.respuesta).length;
-                      const total = seccion.campos.length;
-
-                      return (
-                        <View key={seccion.seccion_uuid} style={{ marginVertical: 4 }}>
-                          <Text style={{ fontSize: 13, color: '#666' }}>
-                            {seccion.nombre}: {respuestasCompletas}/{total} completado
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
             </View>
           )}
         </View>
       </ScrollView>
 
-      {/* Modal de formulario de cierre */}
-      <FormularioCierre
-        visible={cierreModalVisible}
-        incendioUuid={String(id)}
-        onClose={() => setCierreModalVisible(false)}
-        onSaved={async () => {
-          await refetch();
-        }}
-        canFinalize={isAdmin}
-      />
+
     </>
   );
 }

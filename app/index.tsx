@@ -32,18 +32,18 @@ export default function Index() {
       const token = await getToken();
       const isValid = await isTokenValid();
       
-      if (token && isValid) {
-        console.log('✅ Token válido encontrado, redirigiendo al mapa');
-        router.replace('/mapa');
+      if (!token || !isValid) {
+        console.log('❌ Token expirado o no existe. Limpiando y redirigiendo a modo invitado...');
+        await logout(); 
       } else {
-        console.log('❌ Token no válido o no existe, redirigiendo al login');
-        await logout(); // Limpiar token expirado
-        router.replace('/login');
+        console.log('✅ Token válido encontrado');
       }
+      // Ahora la app es pública, TODOS van al mapa primero
+      router.replace('/mapa');
     } catch (error) {
       console.error('Error verificando token:', error);
       await logout();
-      router.replace('/login');
+      router.replace('/mapa');
     }
   };
 

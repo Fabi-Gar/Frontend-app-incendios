@@ -20,9 +20,10 @@ interface Props {
   onNavigate: (route: string) => void;
   isAdmin?: boolean;
   isInstitucion?: boolean;
+  isLoggedIn?: boolean;
 }
 
-export const MenuDrawer = ({ animation, onClose, onNavigate, isAdmin = false, isInstitucion = false }: Props) => {
+export const MenuDrawer = ({ animation, onClose, onNavigate, isAdmin = false, isInstitucion = false, isLoggedIn = false }: Props) => {
   const canManage = isAdmin || isInstitucion;
   const handleLogout = () => {
     Alert.alert(
@@ -44,24 +45,33 @@ export const MenuDrawer = ({ animation, onClose, onNavigate, isAdmin = false, is
     );
   };
 
+  const handleLogin = () => {
+    onClose();
+    router.replace('/login');
+  };
+
   return (
     <Animated.View style={[styles.drawer, { left: animation }]}>
       <Text style={styles.title}>App incendios</Text>
 
-      <TouchableOpacity style={styles.option} onPress={() => onNavigate('Mi Usuario')}>
-        <Ionicons name="person-circle" size={20} color="#37474F" style={styles.icon} />
-        <Text style={styles.optionText}>Mi perfil</Text>
-      </TouchableOpacity>
+      {isLoggedIn && (
+        <>
+          <TouchableOpacity style={styles.option} onPress={() => onNavigate('Mi Usuario')}>
+            <Ionicons name="person-circle" size={20} color="#37474F" style={styles.icon} />
+            <Text style={styles.optionText}>Mi perfil</Text>
+          </TouchableOpacity>
 
-      <TouchableOpacity style={styles.option} onPress={() => onNavigate('notificaciones')}>
-        <Ionicons name="notifications" size={20} color="#37474F" style={styles.icon} />
-        <Text style={styles.optionText}>Notificaciones</Text>
-      </TouchableOpacity>
+          <TouchableOpacity style={styles.option} onPress={() => onNavigate('notificaciones')}>
+            <Ionicons name="notifications" size={20} color="#37474F" style={styles.icon} />
+            <Text style={styles.optionText}>Notificaciones</Text>
+          </TouchableOpacity>
 
-      <TouchableOpacity style={styles.option} onPress={() => onNavigate('preferencias')}>
-        <Ionicons name="settings" size={20} color="#37474F" style={styles.icon} />
-        <Text style={styles.optionText}>Preferencias</Text>
-      </TouchableOpacity>
+          <TouchableOpacity style={styles.option} onPress={() => onNavigate('preferencias')}>
+            <Ionicons name="settings" size={20} color="#37474F" style={styles.icon} />
+            <Text style={styles.optionText}>Preferencias</Text>
+          </TouchableOpacity>
+        </>
+      )}
 
       <Text style={styles.section}>Otras opciones</Text>
 
@@ -107,9 +117,15 @@ export const MenuDrawer = ({ animation, onClose, onNavigate, isAdmin = false, is
       )}
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Cerrar sesión</Text>
-        </TouchableOpacity>
+        {isLoggedIn ? (
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutText}>Cerrar sesión</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={[styles.logoutButton, { backgroundColor: '#4CAF50' }]} onPress={handleLogin}>
+            <Text style={styles.logoutText}>Iniciar sesión</Text>
+          </TouchableOpacity>
+        )}
         <Text style={styles.version}>v 0.0.0.0</Text>
       </View>
     </Animated.View>

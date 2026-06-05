@@ -731,13 +731,15 @@ export default function IncendiosList() {
 
       return (items || []).filter((it) => {
         if (s) {
+          const deptoNombre = (it as any).localizacion?.departamento?.nombre || '';
+          const muniNombre = (it as any).localizacion?.municipio?.nombre || '';
           const regionNombre =
             typeof (it as any).region === 'object' && (it as any).region
               ? ((it as any).region as any).nombre || ''
               : typeof (it as any).region === 'string'
               ? (it as any).region
               : '';
-          const txt = `${(it as any).titulo || ''} ${(it as any).descripcion || ''} ${regionNombre}`.toLowerCase();
+          const txt = `${(it as any).titulo || ''} ${(it as any).descripcion || ''} ${regionNombre} ${deptoNombre} ${muniNombre}`.toLowerCase();
           if (!txt.includes(s)) return false;
         }
 
