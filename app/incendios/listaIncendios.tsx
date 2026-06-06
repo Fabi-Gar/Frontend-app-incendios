@@ -1,6 +1,7 @@
 // app/incendios/listaIncendios.tsx
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Image } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { Image } from 'expo-image';
 import { Text, TextInput, Chip, Snackbar } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
@@ -11,6 +12,7 @@ import { isAdminUser } from '../utils/roles';
 import { api } from '@/services/client';
 import { getFirstPhotoUrlByIncendio } from '@/services/photos';
 import { cierreColor, cierreBadgeStyle } from '@/app/utils/estadoCierre';
+import { formatPlaceName } from '@/app/utils/format';
 
 /* ------------------ helpers ------------------ */
 function timeAgo(iso?: string | null) {
@@ -33,12 +35,27 @@ const PAGE_SIZE = 10;
 // id normalizado
 const getId = (it: any) => String(it?.id ?? it?.incendio_uuid ?? '');
 
+// El módulo dinámico de "cierre" se eliminó en el refactor. El estado del
+// incendio (estado_incendio) ya viene en cada item, así que mapeamos su nombre
+// a uno de los buckets visuales que entiende cierreColor/cierreBadgeStyle.
+const estadoIncendioABucket = (it: any): string => {
+  const nombre = String(
+    it?.estadoActual?.estado?.nombre ?? it?.estado_incendio?.nombre ?? ''
+  ).toLowerCase();
+  if (nombre.includes('extingu')) return 'Extinguido';
+  if (nombre.includes('cierre')) return 'Extinguido';
+  if (nombre.includes('controlad')) return 'Controlado';
+  if (nombre.includes('activo')) return 'Controlando';
+  return 'Reportado';
+};
+
 // creado/actualizado para ordenar
 const getWhen = (it: any) =>
   it?.actualizado_en || it?.actualizadoEn || it?.creado_en || it?.creadoEn || it?.estadoActual?.fecha || null;
 
 // Miniatura: intenta varias fuentes del objeto normalizado
 const pickDirectThumbFields = (it: any): string | null =>
+  it?.foto_portada ||
   it?.thumbnailUrl ||
   it?.portadaUrl ||
   (Array.isArray(it?.fotos) && it.fotos[0]?.url) ||
@@ -87,10 +104,15 @@ export default function IncendiosList() {
 
   // Rate limiting protection y control de scroll
   const lastRequestTimeRef = useRef<number>(0);
+  // Cola para serializar TODAS las llamadas (evita ráfagas concurrentes -> 429)
+  const requestQueueRef = useRef<Promise<any>>(Promise.resolve());
   const lastEndReachedTimeRef = useRef<number>(0);
   const isScrollingRef = useRef<boolean>(false);
   const scrollEndTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef<boolean>(true);
+
+  // ==== Estado de Foco (para evitar onEndReached en background en Web) ====
+  const isFocusedRef = useRef<boolean>(true);
 
   // ==== Debounce búsqueda ====
   useEffect(() => {
@@ -101,16 +123,20 @@ export default function IncendiosList() {
   }, [q]);
 
   // ==== Rate Limiting Helper ====
-  const executeWithRateLimit = useCallback(async (requestFn: () => Promise<any>, minDelay: number = 1000) => {
-    const now = Date.now();
-    const timeSinceLastRequest = now - lastRequestTimeRef.current;
-    
-    if (timeSinceLastRequest < minDelay) {
-      await new Promise(resolve => setTimeout(resolve, minDelay - timeSinceLastRequest));
-    }
-    
-    lastRequestTimeRef.current = Date.now();
-    return requestFn();
+  const executeWithRateLimit = useCallback((requestFn: () => Promise<any>, minDelay: number = 1000) => {
+    // Encadenamos en una sola cola: aunque lleguen llamadas concurrentes
+    // (p. ej. 6 covers a la vez), se ejecutan una por una espaciadas minDelay.
+    const run = requestQueueRef.current.then(async () => {
+      const wait = minDelay - (Date.now() - lastRequestTimeRef.current);
+      if (wait > 0) {
+        await new Promise(resolve => setTimeout(resolve, wait));
+      }
+      lastRequestTimeRef.current = Date.now();
+      return requestFn();
+    });
+    // Mantener viva la cadena sin propagar errores de una llamada a las siguientes
+    requestQueueRef.current = run.catch(() => {});
+    return run;
   }, []);
 
   // ==== Control de Scroll ====
@@ -158,17 +184,11 @@ export default function IncendiosList() {
             Image.prefetch(normalized).catch(() => {});
             return;
           }
-          
-          // Solo hacer request si no hay thumbnail directo y no estamos scrolleando
-          if (isScrollingRef.current || !isMountedRef.current) return;
-          
-          const url = await executeWithRateLimit(() => getFirstPhotoUrlByIncendio(id), 1500);
-          if (url && isMountedRef.current) {
-            const normalized = encodeURI(url);
-            metaCacheRef.current.covers[id] = normalized;
-            setCovers(prev => ({ ...prev, [id]: normalized }));
-            Image.prefetch(normalized).catch(() => {});
-          }
+
+          // Como el backend ahora envía foto_portada, si direct es null significa que genuinamente NO hay foto.
+          // Abortamos aquí mismo sin hacer peticiones a la API para evitar N+1 queries.
+          metaCacheRef.current.covers[id] = 'none';
+          return;
         } catch (error: any) {
           if (error.name === 'AbortError') return;
           console.warn(`[COVER] Error loading cover for ${id}:`, error?.message);
@@ -189,8 +209,8 @@ export default function IncendiosList() {
   // Cargar covers de visibles (como markers)
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     try {
-      // No cargar covers mientras se está scrolleando
-      if (isScrollingRef.current || !isMountedRef.current) return;
+      // No cargar covers mientras se está scrolleando o en background
+      if (isScrollingRef.current || !isMountedRef.current || !isFocusedRef.current) return;
 
       // Precargar solo los que son visibles y no están en cache
       for (const v of viewableItems || []) {
@@ -220,64 +240,22 @@ export default function IncendiosList() {
     }
 
     try {
-      const ids = Array.from(new Set(arr.map(it => getId(it)).filter(Boolean)));
-
-      // Filtrar IDs que ya están en cache o en proceso
-      const pendientes = ids.filter(id =>
-        !(id in metaCacheRef.current.estados) &&
-        !inFlightEstados.current.has(id)
-      );
-
-      if (!pendientes.length) {
-        setCierreEstados(prev => ({ ...prev, ...metaCacheRef.current.estados }));
-        return;
+      // Derivamos el estado de cada incendio localmente (ya no hay endpoint de cierre).
+      const estados: Record<string, string> = {};
+      for (const it of arr) {
+        const id = getId(it);
+        if (!id) continue;
+        estados[id] = estadoIncendioABucket(it);
       }
 
-      // Marcar como en proceso
-      metaCacheRef.current.fetchingEstados = true;
-      pendientes.forEach(id => inFlightEstados.current.add(id));
-
-      const { data } = await executeWithRateLimit(() =>
-        api.get('/api/cierre/estados', {
-          params: { ids: pendientes.join(',') },
-          signal: abortControllerRef.current?.signal,
-          timeout: 10000,
-        }),
-        1200
-      );
-
       if (!isMountedRef.current) return;
-
-      const estados: Record<string, string> = {};
-      for (const id of pendientes) {
-        const entry = data?.byId?.[id];
-        estados[id] = entry?.estado || 'Reportado';
-      }
-
-      metaCacheRef.current.estados = { ...metaCacheRef.current.estados, ...estados };
-      setCierreEstados(prev => ({ ...prev, ...estados }));
-    } catch (error: any) {
-      if (error.name === 'AbortError') return;
-
-      console.warn('[ESTADOS] Error loading estados:', error?.message);
-
-      if (!isMountedRef.current) return;
-
-      const ids = Array.from(new Set(arr.map(it => getId(it)).filter(Boolean)));
-      const pendientes = ids.filter(id => !(id in metaCacheRef.current.estados));
-
-      const estados: Record<string, string> = {};
-      for (const id of pendientes) estados[id] = 'Reportado';
 
       metaCacheRef.current.estados = { ...metaCacheRef.current.estados, ...estados };
       setCierreEstados(prev => ({ ...prev, ...estados }));
     } finally {
       metaCacheRef.current.fetchingEstados = false;
-      // Limpiar estados en proceso
-      const ids = Array.from(new Set(arr.map(it => getId(it)).filter(Boolean)));
-      ids.forEach(id => inFlightEstados.current.delete(id));
     }
-  }, [executeWithRateLimit]);
+  }, []);
 
   // ==== Carga (con paginación de 10) ====
   const fetchApprovedPage = useCallback(async (p: number, signal?: AbortSignal) => {
@@ -619,6 +597,8 @@ export default function IncendiosList() {
   
   useFocusEffect(
     useCallback(() => {
+      isFocusedRef.current = true;
+      
       // Evitar ejecución en mount inicial
       if (!focusCallbackRef.current) {
         focusCallbackRef.current = true;
@@ -664,6 +644,7 @@ export default function IncendiosList() {
 
       return () => {
         isActive = false;
+        isFocusedRef.current = false;
       };
     }, [])
   ); // ✅ Sin dependencias para evitar re-creaciones
@@ -707,7 +688,7 @@ export default function IncendiosList() {
         return;
       }
       
-      if (!hasMore || loadingRef.current || refreshing || isScrollingRef.current || !isMountedRef.current) {
+      if (!isFocusedRef.current || !hasMore || loadingRef.current || refreshing || isScrollingRef.current || !isMountedRef.current) {
         return;
       }
       
@@ -731,8 +712,10 @@ export default function IncendiosList() {
 
       return (items || []).filter((it) => {
         if (s) {
-          const deptoNombre = (it as any).localizacion?.departamento?.nombre || '';
-          const muniNombre = (it as any).localizacion?.municipio?.nombre || '';
+          const rawDepto = (it as any).localizacion?.departamento;
+          const rawMuni = (it as any).localizacion?.municipio;
+          const deptoNombre = formatPlaceName(typeof rawDepto === 'string' ? rawDepto : rawDepto?.nombre);
+          const muniNombre = formatPlaceName(typeof rawMuni === 'string' ? rawMuni : rawMuni?.nombre);
           const regionNombre =
             typeof (it as any).region === 'object' && (it as any).region
               ? ((it as any).region as any).nombre || ''
@@ -869,7 +852,13 @@ export default function IncendiosList() {
               >
                 <View style={styles.left}>
                   {thumb ? (
-                    <Image source={{ uri: thumb }} style={styles.thumb} />
+                    <Image 
+                      source={{ uri: thumb }} 
+                      style={styles.thumb} 
+                      contentFit="cover"
+                      transition={300}
+                      cachePolicy="memory-disk"
+                    />
                   ) : (
                     <View style={styles.leftIcon}>
                       <Ionicons name="flame" size={28} color={flame} />

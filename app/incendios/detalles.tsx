@@ -13,6 +13,7 @@ import { showToast } from '@/hooks/uiStore';
 
 // NUEVO: mismo helper usado en el mapa para resolver portada
 import { getFirstPhotoUrlByIncendio } from '@/services/photos';
+import { formatPlaceName } from '@/app/utils/format';
 
 // import { getFormularioCierre, FormularioCierre as FormularioCierreType } from '@/services/cierre';
 
@@ -176,8 +177,11 @@ export default function DetalleIncendio() {
     
     // Localización
     const loc = (item as any)?.localizacion;
-    if (loc?.departamento?.nombre) rows.push({ id: 'depto', title: 'Departamento', text: loc.departamento.nombre });
-    if (loc?.municipio?.nombre) rows.push({ id: 'muni', title: 'Municipio', text: loc.municipio.nombre });
+    // departamento/municipio ahora son texto en la nueva estructura relacional
+    const locDepto = typeof loc?.departamento === 'string' ? loc.departamento : loc?.departamento?.nombre;
+    const locMuni = typeof loc?.municipio === 'string' ? loc.municipio : loc?.municipio?.nombre;
+    if (locDepto) rows.push({ id: 'depto', title: 'Departamento', text: formatPlaceName(locDepto) });
+    if (locMuni) rows.push({ id: 'muni', title: 'Municipio', text: formatPlaceName(locMuni) });
     if (loc?.lugar_poblado) rows.push({ id: 'lugar', title: 'Lugar poblado', text: loc.lugar_poblado });
     if (loc?.finca) rows.push({ id: 'finca', title: 'Finca', text: loc.finca });
     
@@ -399,14 +403,14 @@ export default function DetalleIncendio() {
   }
 
   // KPIs del reporte inicial (ahora en el incendio) o fallback de INAB
-  const repDepto = (item as any)?.departamento?.nombre || (item as any)?.inab_departamento || '-';
-  const repMuni  = (item as any)?.municipio?.nombre || (item as any)?.inab_municipio || '-';
+  const repDepto = formatPlaceName((item as any)?.departamento?.nombre || (item as any)?.inab_departamento) || '-';
+  const repMuni  = formatPlaceName((item as any)?.municipio?.nombre || (item as any)?.inab_municipio) || '-';
   const repFecha = (item as any)?.reportado_en ? new Date((item as any).reportado_en).toLocaleString() : ((item as any)?.inab_fecha_hora ? new Date((item as any).inab_fecha_hora).toLocaleString() : '-');
   const repMedio = (item as any)?.medio?.nombre || ((item as any)?.inab_objectid ? 'INAB (Sincronizado vía API)' : 'App (Reporte interno)');
 
   const repUsuario = (item as any)?.reportado_por || (item as any)?.creado_por || (item as any)?.creadoPor || null;
-  const repNombre = (item as any)?.inab_reportado_por || [repUsuario?.nombre, repUsuario?.apellido].filter(Boolean).join(' ') || (item as any)?.reportado_por_nombre || '—';
-  const repInstit = (item as any)?.inab_institucion || (item as any)?.institucion_reporte?.nombre || (repUsuario?.institucion?.nombre ?? '—');
+  const repNombre = (item as any)?.inab_reportado_por || (item as any)?.reportado_por_nombre || [repUsuario?.nombre, repUsuario?.apellido].filter(Boolean).join(' ') || '—';
+  const repInstit = (item as any)?.inab_institucion || (item as any)?.responsable?.institucion || (item as any)?.institucion_reporte?.nombre || (repUsuario?.institucion?.nombre ?? '—');
   const repTel = (item as any)?.telefono ?? repUsuario?.telefono ?? '—';
 
   const Row = ({ label, value }: { label: string; value?: string | null }) => (
@@ -460,6 +464,13 @@ export default function DetalleIncendio() {
             {!(item as any)?.inab_objectid && !(item as any)?.inab_globalid && (
               <View style={{ backgroundColor: '#E3F2FD', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start', marginTop: 4 }}>
                 <Text style={{ color: '#1565C0', fontSize: 12, fontWeight: 'bold' }}>📱 Reporte App</Text>
+              </View>
+            )}
+            
+            {/* Estado del incendio */}
+            {item?.estado_incendio?.nombre && (
+              <View style={{ marginTop: 8 }}>
+                <StatusBadge status={item.estado_incendio.nombre} />
               </View>
             )}
             

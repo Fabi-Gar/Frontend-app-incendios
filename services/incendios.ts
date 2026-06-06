@@ -69,15 +69,24 @@ export type Incendio = {
 
   portadaUrl?: string | null;
   thumbnailUrl?: string | null;
+  foto_portada?: string | null;
 
   // --- Datos del reporte fusionados ---
-  departamento?: { id: string; nombre: string } | null;
-  municipio?: { id: string; nombre: string } | null;
+  departamento?: { id?: string; nombre: string } | null;
+  municipio?: { id?: string; nombre: string } | null;
   lugar_poblado?: string | null;
   finca?: string | null;
-  medio?: { id: string; nombre: string } | null;
+  medio?: { id?: string; nombre: string } | null;
   telefono?: string | null;
   reportado_en?: string | null;
+  reportado_por_nombre?: string | null;
+
+  // --- Relaciones anidadas del detalle (esquema relacional nuevo) ---
+  localizacion?: any | null;
+  control?: any | null;
+  vegetacion?: any | null;
+  meteorologia?: any | null;
+  responsable?: any | null;
 
   // --- Datos de INAB (Sincronización) ---
   inab_objectid?: number | null;
@@ -182,7 +191,8 @@ function pickId(o: any): string {
 
 // Mapea distintos formatos de estado actual -> EstadoActual
 function normalizeEstadoActual(raw: any): EstadoActual | null | undefined {
-  const ea = raw?.estadoActual ?? raw?.estado_actual;
+  // estado_incendio es la relación que envía el backend tras el refactor
+  const ea = raw?.estadoActual ?? raw?.estado_actual ?? raw?.estado_incendio;
   if (!ea) return ea;
 
   // Caso 1: { estado: {id,nombre,color}, fecha / fechaCambio }
@@ -313,15 +323,24 @@ function fromBackendIncendio(raw: any): Incendio {
 
     portadaUrl,
     thumbnailUrl,
+    foto_portada: raw?.foto_portada !== undefined ? raw.foto_portada : undefined,
 
-    // --- Datos del reporte fusionados ---
-    departamento: raw?.departamento ?? null,
-    municipio: raw?.municipio ?? null,
-    lugar_poblado: getStr(raw, ['lugar_poblado', 'lugarPoblado']) ?? null,
-    finca: getStr(raw, ['finca']) ?? null,
-    medio: raw?.medio ?? null,
-    telefono: getStr(raw, ['telefono']) ?? null,
-    reportado_en: getDateLike(raw, ['reportado_en', 'reportadoEn']) ?? null,
+    // --- Datos del reporte fusionados (aplanados desde las relaciones nuevas) ---
+    departamento: raw?.departamento ?? (raw?.localizacion?.departamento ? { nombre: raw.localizacion.departamento } : null),
+    municipio: raw?.municipio ?? (raw?.localizacion?.municipio ? { nombre: raw.localizacion.municipio } : null),
+    lugar_poblado: getStr(raw, ['lugar_poblado', 'lugarPoblado']) ?? raw?.localizacion?.lugar_poblado ?? null,
+    finca: getStr(raw, ['finca']) ?? raw?.localizacion?.finca ?? null,
+    medio: raw?.medio ?? (raw?.responsable?.medio_aviso ? { nombre: raw.responsable.medio_aviso } : null),
+    telefono: getStr(raw, ['telefono']) ?? raw?.responsable?.telefono ?? null,
+    reportado_en: getDateLike(raw, ['reportado_en', 'reportadoEn']) ?? raw?.responsable?.fecha_hora_aviso ?? null,
+    reportado_por_nombre: raw?.reportado_por_nombre ?? raw?.responsable?.reportado_por ?? null,
+
+    // --- Relaciones anidadas (las consume la pantalla de detalle) ---
+    localizacion: raw?.localizacion ?? null,
+    control: raw?.control ?? null,
+    vegetacion: raw?.vegetacion ?? null,
+    meteorologia: raw?.meteorologia ?? null,
+    responsable: raw?.responsable ?? null,
 
     // --- Datos INAB ---
     inab_objectid: raw?.inab_objectid ?? null,
